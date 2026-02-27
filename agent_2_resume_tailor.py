@@ -12,10 +12,11 @@ Usage:
     python agent_2_resume_tailor.py --resume my_resume.txt --jd target_jd.txt --output tailored_resume.txt
 """
 
-import anthropic
+from openai import OpenAI
 import argparse
 import json
 import re
+import os
 from pathlib import Path
 
 
@@ -24,10 +25,10 @@ def load_text(filepath: str) -> str:
         return f.read().strip()
 
 
-def extract_keywords_from_jd(client: anthropic.Anthropic, jd: str) -> dict:
+def extract_keywords_from_jd(client: OpenAI, jd: str) -> dict:
     """First pass: extract all critical keywords from JD"""
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=1000,
         messages=[{
             "role": "user",
@@ -49,7 +50,7 @@ JOB DESCRIPTION:
 Return ONLY valid JSON."""
         }]
     )
-    raw = message.content[0].text.strip()
+    raw = response.choices[0].message.content.strip()
     try:
         return json.loads(raw)
     except:
@@ -57,22 +58,21 @@ Return ONLY valid JSON."""
         return json.loads(match.group()) if match else {}
 
 
-def tailor_resume(client: anthropic.Anthropic, resume: str, jd: str, keywords: dict) -> dict:
+def tailor_resume(client: OpenAI, resume: str, jd: str, keywords: dict) -> dict:
     """Second pass: rewrite resume to match JD"""
-    
+
     keyword_summary = json.dumps(keywords, indent=2)
-    
-    message = client.messages.create(
-        model="claude-opus-4-6",
+
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=5000,
-        system="""You are an expert resume writer for senior tech professionals in India. 
+        messages=[
+            {"role": "system", "content": """You are an expert resume writer for senior tech professionals in India.
 You specialize in QA, Testing, and Engineering Management roles at product companies and GCCs.
 You understand Naukri.com and LinkedIn India ATS systems deeply.
 You NEVER fabricate experience. You reframe REAL experience using better language.
-You write in a confident, executive tone appropriate for Director/Principal level roles.""",
-        messages=[{
-            "role": "user",
-            "content": f"""Rewrite my resume to maximize ATS match for this specific JD. 
+You write in a confident, executive tone appropriate for Director/Principal level roles."""},
+            {"role": "user", "content": f"""Rewrite my resume to maximize ATS match for this specific JD. 
 
 RULES:
 1. Never fabricate experience — only rephrase and reframe real experience
@@ -103,11 +103,11 @@ Return a JSON object:
   "summary_rewrite": "Rewritten professional summary targeting this JD"
 }}
 
-Return ONLY valid JSON."""
-        }]
+Return ONLY valid JSON."""}
+        ]
     )
 
-    raw = message.content[0].text.strip()
+    raw = response.choices[0].message.content.strip()
     try:
         return json.loads(raw)
     except:
@@ -167,7 +167,10 @@ def main():
     parser.add_argument("--output", default="tailored_resume.txt", help="Output file for tailored resume")
     args = parser.parse_args()
 
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
 
     resume = load_text(args.resume)
     jd = load_text(args.jd)

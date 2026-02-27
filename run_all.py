@@ -7,7 +7,7 @@ Usage:
     python run_all.py --resume my_resume.txt --jd target_jd.txt --profile linkedin.txt
 """
 
-import anthropic
+from openai import OpenAI
 import argparse
 import sys
 import os
@@ -21,7 +21,10 @@ from agent_4_interview import run_behavioral_prep, INTERVIEWER_PERSONAS
 
 
 def orchestrate(resume_path: str, jd_path: str, profile_path: str = None):
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
 
     resume = load_text(resume_path)
     jd = load_text(jd_path)
