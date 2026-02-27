@@ -2,6 +2,18 @@
 
 This project has been updated to use xAI's Grok API instead of Anthropic's Claude API.
 
+## 🎨 Web UI Available!
+
+**NEW:** Beautiful web interface with secure API key management!
+
+```bash
+python app.py
+```
+
+Then open http://localhost:5000 in your browser.
+
+See [README_WEB_UI.md](README_WEB_UI.md) for full web UI documentation.
+
 ## Setup Instructions
 
 ### 1. Install Dependencies

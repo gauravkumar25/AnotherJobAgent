@@ -1,0 +1,78 @@
+name: Deploy Career Agents UI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run health check
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          python -c "import os; print('✓ XAI_API_KEY configured' if os.getenv('XAI_API_KEY') else '✗ XAI_API_KEY missing')"
+
+      - name: Test Flask app
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          # Start Flask in background
+          python app.py &
+          APP_PID=$!
+
+          # Wait for server to start
+          sleep 5
+
+          # Test health endpoint
+          curl -f http://localhost:5000/api/health || exit 1
+
+          # Stop Flask
+          kill $APP_PID
+
+      # Optional: Deploy to cloud platform
+      # Uncomment and configure for your platform
+
+      # Example: Deploy to Google Cloud Run
+      # - name: Deploy to Cloud Run
+      #   uses: google-github-actions/deploy-cloudrun@v2
+      #   with:
+      #     service: career-agents-ui
+      #     region: us-central1
+      #     image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/career-agents-ui
+      #     env_vars: |
+      #       XAI_API_KEY=${{ secrets.XAI_API_KEY }}
+
+      # Example: Deploy to Heroku
+      # - name: Deploy to Heroku
+      #   uses: akhileshns/heroku-deploy@v3.12.14
+      #   with:
+      #     heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+      #     heroku_app_name: career-agents-ui
+      #     heroku_email: ${{ secrets.HEROKU_EMAIL }}
+
+      # Example: Deploy to AWS ECS
+      # - name: Deploy to AWS ECS
+      #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      #   with:
+      #     task-definition: task-definition.json
+      #     service: career-agents-ui
+      #     cluster: production
+      #     wait-for-service-stability: true

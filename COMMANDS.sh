@@ -1,10 +1,21 @@
-# HOW TO USE YOUR CAREER AGENTS
-# ================================
+# HOW TO USE YOUR CAREER AGENTS (Grok API Edition)
+# ================================================
 # Replace the sample content below with your real data
 
+# ── OPTION A: WEB UI (RECOMMENDED) ─────────────────────
+# Beautiful web interface with secure API key management
+export XAI_API_KEY="your-xai-key-here"   # Get from console.x.ai
+./start_ui.sh
+
+# Or manually:
+# pip install -r requirements.txt
+# python app.py
+# Open http://localhost:5000
+
+# ── OPTION B: COMMAND LINE ─────────────────────────────
 # ── STEP 1: SETUP ──────────────────────────────────────
-pip install anthropic
-export ANTHROPIC_API_KEY="sk-ant-your-key-here"   # Get from console.anthropic.com
+pip install -r requirements.txt
+export XAI_API_KEY="your-xai-key-here"   # Get from console.x.ai
 
 # ── STEP 2: PREPARE YOUR INPUT FILES ───────────────────
 # my_resume.txt       → Paste your resume as plain text
