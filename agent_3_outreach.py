@@ -15,7 +15,7 @@ Usage:
     python agent_3_outreach.py --profile profile.txt --your_skills "..." --angle "job_interest"
 """
 
-import anthropic
+from openai import OpenAI
 import argparse
 import os
 from pathlib import Path
@@ -36,27 +36,26 @@ OUTREACH_ANGLES = {
 
 
 def generate_outreach(
-    client: anthropic.Anthropic,
+    client: OpenAI,
     profile_text: str,
     your_skills: str,
     angle: str = "connect",
     your_name: str = "QA Professional"
 ) -> dict:
-    
+
     angle_desc = OUTREACH_ANGLES.get(angle, angle)
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=2000,
-        system="""You are an expert at professional networking in India's tech industry.
+        messages=[
+            {"role": "system", "content": """You are an expert at professional networking in India's tech industry.
 You understand the LinkedIn culture of Gurugram, NCR, and remote tech hiring.
 You write messages that feel human, specific, and respectful of the recipient's time.
-You never use phrases like: "I'd love to connect", "I came across your profile", 
+You never use phrases like: "I'd love to connect", "I came across your profile",
 "Reaching out to expand my network", or any generic opener.
-You always find ONE specific thing from their profile to reference.""",
-        messages=[{
-            "role": "user",
-            "content": f"""Write LinkedIn outreach messages for this person. 
+You always find ONE specific thing from their profile to reference."""},
+            {"role": "user", "content": f"""Write LinkedIn outreach messages for this person. 
 
 MY BACKGROUND/SKILLS: {your_skills}
 OUTREACH ANGLE: {angle_desc}
@@ -88,15 +87,18 @@ Keep all messages:
 - Specific to THIS person (mention their name, company, or a real detail)
 - Confident but not desperate
 - India-culturally appropriate (formal enough but not stiff)
-- Focused on value exchange, not just asking"""
-        }]
+- Focused on value exchange, not just asking"""}
+        ]
     )
 
-    return message.content[0].text
+    return response.choices[0].message.content
 
 
 def batch_outreach(profiles_folder: str, your_skills: str, angle: str, your_name: str):
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
     profiles = list(Path(profiles_folder).glob("*.txt"))
 
     print(f"\n📋 Processing {len(profiles)} profiles from {profiles_folder}")
@@ -118,7 +120,10 @@ def batch_outreach(profiles_folder: str, your_skills: str, angle: str, your_name
 
 
 def single_outreach(profile_path: str, your_skills: str, angle: str, your_name: str):
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
     profile_text = load_text(profile_path)
     
     person_name = Path(profile_path).stem.replace("_", " ").title()
@@ -140,7 +145,10 @@ def single_outreach(profile_path: str, your_skills: str, angle: str, your_name: 
 
 def interactive_mode():
     """Run as an interactive CLI agent"""
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
     
     print("\n🤝 LinkedIn Outreach Drafter — Interactive Mode")
     print("="*50)

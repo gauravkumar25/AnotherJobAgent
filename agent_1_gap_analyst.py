@@ -12,7 +12,7 @@ Usage:
     python agent_1_gap_analyst.py --resume my_resume.txt --jd_folder ./jds/
 """
 
-import anthropic
+from openai import OpenAI
 import argparse
 import os
 import json
@@ -30,7 +30,10 @@ def load_jds_from_folder(folder: str) -> dict:
 
 
 def run_gap_analysis(resume: str, jds: dict) -> dict:
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
 
     # Build combined JD block
     jd_block = "\n\n".join(
@@ -75,14 +78,16 @@ Return ONLY valid JSON. No markdown, no explanation outside JSON."""
 
     print("🔍 Running gap analysis... (this may take 20-30 seconds)")
 
-    message = client.messages.create(
-        model="claude-opus-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=4000,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}],
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
     )
 
-    raw = message.content[0].text.strip()
+    raw = response.choices[0].message.content.strip()
 
     # Parse and return
     try:
@@ -133,18 +138,18 @@ def print_gap_report(data: dict):
     print("\n" + "=" * 60)
 
 
-def generate_learning_syllabus(skill: str, client: anthropic.Anthropic) -> str:
+def generate_learning_syllabus(skill: str, client: OpenAI) -> str:
     """Bonus: generate a crash course for a specific gap skill"""
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=1500,
         messages=[{
             "role": "user",
-            "content": f"""Create a 3-day crash course syllabus for "{skill}" specifically for a 
+            "content": f"""Create a 3-day crash course syllabus for "{skill}" specifically for a
 QA Manager transitioning to a senior/director role in India's tech industry.
 
 Format:
-Day 1: [Topic] 
+Day 1: [Topic]
 - What to learn (be specific with links/resources)
 - Hands-on task
 - Time estimate
@@ -163,7 +168,7 @@ Top 5 interview questions you'll be asked about {skill}:
 Keep it practical and India-market relevant."""
         }]
     )
-    return message.content[0].text
+    return response.choices[0].message.content
 
 
 def main():
@@ -204,7 +209,10 @@ def main():
 
     # Optional: generate syllabus
     if args.learn:
-        client = anthropic.Anthropic()
+        client = OpenAI(
+            api_key=os.environ.get("XAI_API_KEY"),
+            base_url="https://api.x.ai/v1"
+        )
         print(f"\n📚 Generating 3-day crash course for: {args.learn}")
         syllabus = generate_learning_syllabus(args.learn, client)
         print(syllabus)

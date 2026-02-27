@@ -19,8 +19,9 @@ Usage:
     python agent_4_interview.py --mode behavioral --role "QA Manager"
 """
 
-import anthropic
+from openai import OpenAI
 import argparse
+import os
 from pathlib import Path
 
 
@@ -54,14 +55,14 @@ INTERVIEWER_PERSONAS = {
 
 
 def run_mock_interview(
-    client: anthropic.Anthropic,
+    client: OpenAI,
     role: str,
     company: str,
     topic: str = None,
     persona_key: str = "principal_engineer"
 ):
     persona = INTERVIEWER_PERSONAS.get(persona_key, INTERVIEWER_PERSONAS["principal_engineer"])
-    
+
     system_prompt = f"""You are a {persona['title']} at {company}, interviewing a candidate for a {role} position.
 
 YOUR INTERVIEW STYLE: {persona['style']}
@@ -80,8 +81,8 @@ TOPIC FOR TODAY: {topic or f"General {role} interview covering technical depth a
 
 Start the interview now. Introduce yourself briefly, then ask Question 1."""
 
-    conversation_history = []
-    
+    conversation_history = [{"role": "system", "content": system_prompt}]
+
     print(f"\n🎙️  MOCK INTERVIEW SESSION")
     print(f"   Role: {role} | Company: {company}")
     print(f"   Interviewer: {persona['title']}")
@@ -91,82 +92,78 @@ Start the interview now. Introduce yourself briefly, then ask Question 1."""
     print("="*60 + "\n")
 
     # Initial message
-    initial_response = client.messages.create(
-        model="claude-opus-4-6",
+    initial_response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=500,
-        system=system_prompt,
-        messages=[{"role": "user", "content": "Start the interview."}]
+        messages=conversation_history + [{"role": "user", "content": "Start the interview."}]
     )
-    
-    interviewer_msg = initial_response.content[0].text
+
+    interviewer_msg = initial_response.choices[0].message.content
     print(f"🧑‍💼 Interviewer: {interviewer_msg}\n")
+    conversation_history.append({"role": "user", "content": "Start the interview."})
     conversation_history.append({"role": "assistant", "content": interviewer_msg})
 
     while True:
         candidate_input = input("You: ").strip()
-        
+
         if candidate_input.lower() == "quit":
             print("\n📝 Requesting final assessment...")
             conversation_history.append({"role": "user", "content": candidate_input})
             conversation_history.append({"role": "user", "content": "Give me your final assessment. Hire/No Hire and why. Be specific."})
-            
-            final = client.messages.create(
-                model="claude-opus-4-6",
+
+            final = client.chat.completions.create(
+                model="grok-beta",
                 max_tokens=800,
-                system=system_prompt,
                 messages=conversation_history
             )
-            print(f"\n🧑‍💼 Final Assessment:\n{final.content[0].text}")
+            print(f"\n🧑‍💼 Final Assessment:\n{final.choices[0].message.content}")
             break
-        
+
         if candidate_input.lower() == "hint":
             hint_messages = conversation_history + [
                 {"role": "user", "content": "Give me a hint — what key points should a strong candidate cover in their answer to your last question? Don't give the full answer, just the framework."}
             ]
-            hint = client.messages.create(
-                model="claude-sonnet-4-6",
+            hint = client.chat.completions.create(
+                model="grok-beta",
                 max_tokens=400,
-                system=system_prompt,
                 messages=hint_messages
             )
-            print(f"\n💡 Hint: {hint.content[0].text}\n")
+            print(f"\n💡 Hint: {hint.choices[0].message.content}\n")
             continue
-        
+
         if candidate_input.lower() == "skip":
             candidate_input = "I'll skip this question and move to the next."
-        
+
         conversation_history.append({"role": "user", "content": candidate_input})
-        
-        response = client.messages.create(
-            model="claude-opus-4-6",
+
+        response = client.chat.completions.create(
+            model="grok-beta",
             max_tokens=600,
-            system=system_prompt,
             messages=conversation_history
         )
-        
-        interviewer_response = response.content[0].text
+
+        interviewer_response = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": interviewer_response})
-        
+
         print(f"\n🧑‍💼 Interviewer: {interviewer_response}\n")
 
 
-def run_code_review(client: anthropic.Anthropic, code: str, language: str = "python"):
+def run_code_review(client: OpenAI, code: str, language: str = "python"):
     """Roasts your code and suggests staff-engineer-level refactors"""
-    
+
     print("\n🔍 CODE REVIEW SESSION")
     print("="*60)
     print("Analyzing your code as a Staff/Principal Engineer would...\n")
 
-    message = client.messages.create(
-        model="claude-opus-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=4000,
-        system="""You are a Staff Engineer / Principal SDET with 15+ years of experience. 
+        messages=[
+            {"role": "system", "content": """You are a Staff Engineer / Principal SDET with 15+ years of experience.
 You've seen thousands of automation codebases. You are direct, sometimes blunt, but always constructive.
 You don't sugarcoat — if code is bad, you say so. But you always explain WHY and show HOW to fix it.
-You reference specific design patterns, SOLID principles, and industry best practices.""",
-        messages=[{
-            "role": "user",
-            "content": f"""Roast this automation code. Be direct. Tell me:
+You reference specific design patterns, SOLID principles, and industry best practices."""},
+            {"role": "user", "content": f"""Roast this automation code. Be direct. Tell me:
 
 1. WHAT'S WRONG (be specific — line by line if needed)
    - Maintainability issues
@@ -188,29 +185,28 @@ You reference specific design patterns, SOLID principles, and industry best prac
 CODE TO REVIEW ({language}):
 ```{language}
 {code}
-```"""
-        }]
+```"""}
+        ]
     )
 
-    print(message.content[0].text)
+    print(response.choices[0].message.content)
 
 
-def run_behavioral_prep(client: anthropic.Anthropic, role: str):
+def run_behavioral_prep(client: OpenAI, role: str):
     """Generate STAR-format behavioral questions with coaching"""
-    
+
     print("\n🎯 BEHAVIORAL INTERVIEW PREP")
     print("="*60)
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=3000,
-        system="""You are an interview coach specializing in senior tech roles in India's product companies.
-You know the behavioral questions that GCC companies (Google, Microsoft, Publicis Sapient), 
+        messages=[
+            {"role": "system", "content": """You are an interview coach specializing in senior tech roles in India's product companies.
+You know the behavioral questions that GCC companies (Google, Microsoft, Publicis Sapient),
 product startups (Zomato, Meesho, PolicyBazaar), and service companies (Infosys, Wipro leadership) ask.
-You teach the STAR method but also know when to use different frameworks (SOAR, CAR).""",
-        messages=[{
-            "role": "user",
-            "content": f"""Generate the top 10 behavioral interview questions for a {role} role, 
+You teach the STAR method but also know when to use different frameworks (SOAR, CAR)."""},
+            {"role": "user", "content": f"""Generate the top 10 behavioral interview questions for a {role} role, 
 specifically in India's tech industry context.
 
 For each question:
@@ -226,29 +222,28 @@ Focus on these themes:
 - Managing underperformers
 - Stakeholder pushback on quality
 - Building a QA team from scratch or improving an existing one
-- Cross-cultural/remote team management"""
-        }]
+- Cross-cultural/remote team management"""}
+        ]
     )
 
-    print(message.content[0].text)
+    print(response.choices[0].message.content)
 
 
-def run_system_design(client: anthropic.Anthropic, role: str, system_to_design: str):
+def run_system_design(client: OpenAI, role: str, system_to_design: str):
     """Generate a system design interview challenge with expected answers"""
-    
+
     print(f"\n🏗️  SYSTEM DESIGN INTERVIEW: {system_to_design}")
     print("="*60)
 
-    message = client.messages.create(
-        model="claude-opus-4-6",
+    response = client.chat.completions.create(
+        model="grok-beta",
         max_tokens=3000,
-        system="""You are a Principal Engineer conducting a system design interview.
+        messages=[
+            {"role": "system", "content": """You are a Principal Engineer conducting a system design interview.
 You specialize in test infrastructure and QA system design at scale.
-Your questions expose whether candidates think at junior level (just "write tests") 
-or at architect level (observability, flakiness mitigation, scalability, cost).""",
-        messages=[{
-            "role": "user",
-            "content": f"""Design a test strategy and test infrastructure for: {system_to_design}
+Your questions expose whether candidates think at junior level (just "write tests")
+or at architect level (observability, flakiness mitigation, scalability, cost)."""},
+            {"role": "user", "content": f"""Design a test strategy and test infrastructure for: {system_to_design}
 
 This is for a {role} candidate. Structure your response as:
 
@@ -263,11 +258,11 @@ PART 2 — WHAT A STRONG CANDIDATE COVERS
 
 PART 3 — SAMPLE STRONG ANSWER (model answer they should aim for)
 PART 4 — COMMON MISTAKES (what junior-level candidates say that fails them)
-PART 5 — FOLLOW-UP QUESTIONS TO PROBE DEEPER"""
-        }]
+PART 5 — FOLLOW-UP QUESTIONS TO PROBE DEEPER"""}
+        ]
     )
 
-    print(message.content[0].text)
+    print(response.choices[0].message.content)
 
 
 def main():
@@ -285,7 +280,10 @@ def main():
     parser.add_argument("--system", help="System to design (for system_design mode)")
     args = parser.parse_args()
 
-    client = anthropic.Anthropic()
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY"),
+        base_url="https://api.x.ai/v1"
+    )
 
     if args.mode == "interview":
         run_mock_interview(client, args.role, args.company, args.topic, args.persona)
