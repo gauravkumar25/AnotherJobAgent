@@ -11,6 +11,10 @@ from openai import OpenAI
 import argparse
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # Import all agents
 sys.path.insert(0, os.path.dirname(__file__))

@@ -18,7 +18,9 @@ pip install -r requirements.txt
 4. Create a new API key
 5. Copy the API key
 
-### 3. Set Up Environment Variables
+### 3. Set Up API Key
+
+#### Option A: Local Development (Environment Variables)
 
 Create a `.env` file in the project root:
 
@@ -37,6 +39,70 @@ Or export it directly in your shell:
 ```bash
 export XAI_API_KEY="your_actual_api_key_here"
 ```
+
+#### Option B: GitHub Secrets (For CI/CD and GitHub Actions)
+
+1. **Add Secret to Your Repository:**
+   - Go to your GitHub repository
+   - Click **Settings** → **Secrets and variables** → **Actions**
+   - Click **New repository secret**
+   - Name: `XAI_API_KEY`
+   - Value: Your actual Grok API key
+   - Click **Add secret**
+
+2. **Use in GitHub Actions Workflow:**
+
+Create `.github/workflows/run-agents.yml`:
+
+```yaml
+name: Run Job Agents
+
+on:
+  workflow_dispatch:
+    inputs:
+      resume_file:
+        description: 'Path to resume file'
+        required: true
+      jd_file:
+        description: 'Path to job description file'
+        required: true
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run agents
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          python run_all.py \
+            --resume ${{ github.event.inputs.resume_file }} \
+            --jd ${{ github.event.inputs.jd_file }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-results
+          path: |
+            tailored_resume.txt
+            outreach_messages.txt
+```
+
+3. **Access the Secret in Code:**
+
+The agents already read from `os.environ.get("XAI_API_KEY")`, so GitHub Secrets will automatically work when set in the workflow's `env` section.
 
 ### 4. Run the Agents
 
@@ -95,12 +161,69 @@ python agent_4_interview.py --mode system_design --role "Principal SDET" --syste
 - Updated response parsing from `message.content[0].text` to `response.choices[0].message.content`
 - Added environment variable support for `XAI_API_KEY`
 
+## Using with GitHub Actions
+
+The agents can be run automatically using GitHub Actions. Here's an example workflow:
+
+### Scheduled Resume Analysis
+
+Create `.github/workflows/weekly-analysis.yml`:
+
+```yaml
+name: Weekly Resume Analysis
+
+on:
+  schedule:
+    - cron: '0 9 * * MON'  # Every Monday at 9 AM
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run gap analysis
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          python agent_1_gap_analyst.py \
+            --resume ./data/resume.txt \
+            --jd_folder ./data/jds/ \
+            --output gap_analysis.json
+
+      - name: Upload analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: gap-analysis-${{ github.run_number }}
+          path: gap_analysis.json
+```
+
+### Security Best Practices
+
+- ✅ **Never commit your API key** to the repository
+- ✅ **Use GitHub Secrets** for CI/CD workflows
+- ✅ **Use `.env` files** for local development (and add `.env` to `.gitignore`)
+- ✅ **Rotate API keys** periodically
+- ✅ **Monitor API usage** at the xAI Console to detect unauthorized use
+
 ## Notes
 
 - Grok uses an OpenAI-compatible API, so we use the `openai` Python library
 - The API endpoint is configured to `https://api.x.ai/v1`
 - All functionality remains the same, just powered by Grok instead of Claude
 - Make sure to monitor your API usage at the xAI Console
+- **Never commit API keys** - use environment variables or GitHub Secrets
 
 ## Support
 

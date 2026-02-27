@@ -1,0 +1,64 @@
+name: Run Job Agents
+
+on:
+  workflow_dispatch:
+    inputs:
+      resume_file:
+        description: 'Path to resume file (relative to repo root)'
+        required: true
+        default: 'data/resume.txt'
+      jd_file:
+        description: 'Path to job description file'
+        required: true
+        default: 'data/jd.txt'
+      profile_file:
+        description: 'Path to LinkedIn profile file (optional)'
+        required: false
+        default: ''
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run agents
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.profile_file }}" ]; then
+            python run_all.py \
+              --resume ${{ github.event.inputs.resume_file }} \
+              --jd ${{ github.event.inputs.jd_file }} \
+              --profile ${{ github.event.inputs.profile_file }}
+          else
+            python run_all.py \
+              --resume ${{ github.event.inputs.resume_file }} \
+              --jd ${{ github.event.inputs.jd_file }}
+          fi
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-results-${{ github.run_number }}
+          path: |
+            tailored_resume.txt
+            outreach_messages.txt
+          retention-days: 30
+
+      - name: Comment on workflow run
+        if: success()
+        run: |
+          echo "✅ Agents completed successfully!"
+          echo "📄 Tailored resume and outreach messages are available in artifacts."
